@@ -21,6 +21,9 @@ phil_scope = iotbx.phil.parse("""\
     .type = space_group
     .help = "Optionally override the space group."
 
+  dose_rate = None
+    .type = float(value_min=0)
+    .help = " Dose rate for characterization images" 
 """, process_includes=True)
 
 
@@ -31,7 +34,7 @@ def run(args):
   from dials.util.options import flatten_reflections
   import libtbx.load_env
 
-  usage = "%s [options] datablock.json | experiments.json | image_*.cbf" %(
+  usage = "%s [options] experiments.json | integrated.pickle" %(
     libtbx.env.dispatcher_name)
 
   parser = OptionParser(
@@ -105,7 +108,6 @@ def run(args):
   scan.set_image_range((1, int(math.ceil(360/oscillation[1]))))
   scan.set_oscillation((0, oscillation[1]))
   print scan
-
 
   
   # Populate the reflection table with predictions
