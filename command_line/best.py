@@ -13,14 +13,13 @@ phil_scope = iotbx.phil.parse("""\
     .type = bool
     .help = "For a scan varying model, force static prediction"
 
-  buffer_size = 0
-    .type = int(value_min=0)
-    .help = "Calculate predictions within a buffer zone of n images either"
-            "size of the scan"
-
   d_min = None
     .type = float(value_min=0)
     .help = "Minimum d-spacing of predicted reflections"
+
+  space_group = None
+    .type = space_group
+    .help = "Optionally override the space group."
 
 """, process_includes=True)
 
@@ -52,8 +51,12 @@ def run(args):
     exit()
   reflections = reflections[0]
   cryst = experiments.crystals()[0]
-  space_group = cryst.get_space_group()
   unit_cell = cryst.get_unit_cell()
+  if params.space_group is not None:
+    space_group = params.space_group.group()
+    assert space_group.is_compatible_unit_cell(unit_cell), unit_cell
+  else:
+    space_group = cryst.get_space_group()
   print space_group.info()
   print unit_cell
 
