@@ -50,15 +50,46 @@ def run(args):
   if len(experiments)==0 or len(reflections)==0:
     parser.print_help()
     exit()
-
-  crystal = experiments.crystals()[0]
-  space_group = crystal.get_space_group()
-  unit_cell = crystal.get_unit_cell()
+  reflections = reflections[0]
+  cryst = experiments.crystals()[0]
+  space_group = cryst.get_space_group()
+  unit_cell = cryst.get_unit_cell()
   print space_group.info()
   print unit_cell
 
   expt = experiments[0]
+  from cctbx import miller, crystal
+  from mmtbx.scaling.data_statistics import wilson_scaling
+  sel = reflections.get_flags(reflections.flags.integrated_sum)
+  reflections = reflections.select(sel)
+  cs = crystal.symmetry(unit_cell=unit_cell, space_group=space_group)
+  ms = miller.set(cs, indices=reflections['miller_index'], anomalous_flag=True)  
+  intensities = miller.array( ms, data=reflections['intensity.sum.value'],
+                              sigmas=flex.sqrt(reflections['intensity.sum.variance']))
+  intensities.set_observation_type_xray_intensity()
+  d_star_sq = intensities.d_star_sq().data()
+  n_bins = 20
+#  binner = intensities.setup_binner_d_star_sq_step(
+#    d_star_sq_step=(flex.max(d_star_sq)-flex.min(d_star_sq)+1e-8)/n_bins)
+  binner = intensities.setup_binner_counting_sorted(n_bins=n_bins)
+  # wilson = intensities.wilson_plot(use_binning=True)
+  # wilson.show()
+  # from matplotlib import pyplot
+  # pyplot.figure()
+  # pyplot.scatter(wilson.binner.bin_centers(2), wilson.data[1:-1])
+  # pyplot.show()
+  wilson=wilson_scaling(intensities, n_residues=200)
+  wilson.iso_scale_and_b.show()
 
+  from matplotlib import pyplot
+  pyplot.figure()
+  pyplot.scatter(wilson.d_star_sq, wilson.mean_I_obs_data, label='Data')
+  pyplot.plot(wilson.d_star_sq, wilson.mean_I_obs_theory, label='theory')
+  pyplot.plot(wilson.d_star_sq, wilson.mean_I_normalisation, label='smoothed' )
+  pyplot.yscale('log')
+  pyplot.legend()
+  pyplot.show()
+  
   import copy
   import math
   # Hack to make the predicter predict reflections outside of the range
@@ -71,6 +102,8 @@ def run(args):
   scan.set_oscillation((0, oscillation[1]))
   print scan
 
+
+  
   # Populate the reflection table with predictions
   predicted = flex.reflection_table.from_predictions(
     expt,
@@ -80,7 +113,7 @@ def run(args):
 
   print len(predicted)
 
-  from cctbx import crystal, miller
+
   space_group = space_group.build_derived_reflection_intensity_group(anomalous_flag=True)
   cs = crystal.symmetry(unit_cell=unit_cell, space_group=space_group)
 
@@ -109,8 +142,10 @@ def run(args):
 
 
     
-  range_for_50 = []
-  range_for_99 = []
+  ranges_dict = {}
+  completeness_levels = [10, 20, 30, 40, 50, 60, 70, 80, 90, 95, 99]
+  for c in completeness_levels:
+          ranges_dict[c]=[]
   from xia2.Modules.PyChef2 import ChefStatistics
   step = 1
   for i in range(0, 360, step):
@@ -126,18 +161,23 @@ def run(args):
     ieither_completeness = chef_stats.ieither_completeness()
     iboth_completeness = chef_stats.iboth_completeness()
 
+    for c in completeness_levels:
+      ranges_dict[c].append(min((ieither_completeness > (c/100)).iselection()))
 
-    range_for_50.append(min((ieither_completeness > 0.5).iselection()))
-    range_for_99.append(min((ieither_completeness > 0.99).iselection()))
-    
+
+
   from matplotlib import pyplot
   pyplot.figure()
-  pyplot.plot(range_for_50)
-  pyplot.plot(range_for_99)  
+  for c in completeness_levels:
+    pyplot.plot(ranges_dict[c], label=str(c))
+#  pyplot.plot(range_for_50)
+#  pyplot.plot(range_for_99)  
   
 #  pyplot.scatter(range(iboth_completeness.size()), iboth_completeness)
+  pyplot.legend()
   pyplot.show()
-  
+
+
 
 if __name__ == '__main__':
   import sys
