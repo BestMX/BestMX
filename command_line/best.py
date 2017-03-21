@@ -78,6 +78,7 @@ def run(args):
   # pyplot.figure()
   # pyplot.scatter(wilson.binner.bin_centers(2), wilson.data[1:-1])
   # pyplot.show()
+  intensities = intensities.merge_equivalents().array()
   wilson=wilson_scaling(intensities, n_residues=200)
   wilson.iso_scale_and_b.show()
 
